@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <Windows.h>
+#include <iostream>
 #pragma comment(lib, "ws2_32.lib")
 
 class ClientSocket
@@ -9,14 +10,17 @@ private:
 	std::string m_ipaddr;
 	int m_port;
 	std::string m_name;
-	HWND hwnd;
+	SOCKET m_sock;
 public:
-	ClientSocket(HWND hwnd, std::string ipaddr, int port, std::string name);
+	ClientSocket( std::string ipaddr, int port, std::string name);
+	ClientSocket();
 	~ClientSocket();
+	void FillIn(std::string ipaddr, int port, std::string name);
 	bool Init();
 	void Run();
-	void Send(int clientSocket, std::string msg);
+	void Send(std::string msg);
 	SOCKET CreateSocket();
 	void Cleanup();
+	SOCKET getSocket();
 };
 
