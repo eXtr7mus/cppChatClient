@@ -22,12 +22,15 @@ void ClientSocket::FillIn(std::string ipaddr, int port, std::string name)
 	m_name = name;
 }
 
+void ClientSocket::setHwnd(HWND hwnd){
+	this->hwnd = hwnd;
+}
+
 bool ClientSocket::Init()
 {
 	WSADATA data;
 	if (WSAStartup(MAKEWORD(2, 2), &data) != 0) {
 		//MessageBox(hwnd, "Cant initialize winsock", "Error", MB_OK);
-		std::cout << "Cant initialize winsock" << std::endl;
 		return false;
 	}
 	return true;
@@ -46,7 +49,6 @@ void ClientSocket::Run()
 	if (connResult == SOCKET_ERROR)
 	{
 		//MessageBox(hwnd, "Cant connect to server", "Error", MB_OK);
-		std::cout << "Cant connect to server" << std::endl;
 		system("pause");
 		closesocket(m_sock);
 		WSACleanup();
@@ -56,10 +58,13 @@ void ClientSocket::Run()
 	char buff[4096];
 		ZeroMemory(buff, 4096);
 	int bytesReceived = recv(m_sock, buff, 4096, 0);
+	std::string temp(buff);
 	if (bytesReceived > 0)
 	{
 		//MessageBox(hwnd, buff, "Hello from server", MB_OK);
-		std::cout << "Hello from server" << std::endl;
+	}
+	if (temp.find("/wn") != std::string::npos) {
+		MessageBox(hwnd, "this nickname is already in use, restart the client", "this nickname is already in use!", MB_OK);
 	}
 }
 

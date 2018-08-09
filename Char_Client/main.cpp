@@ -3,19 +3,21 @@
 #include <string>
 #include "ClientSocket.h"
 #include <sstream>
+#include <algorithm>
+#include <thread>
 #pragma comment(lib, "ws2_32.lib")
 
 
 const char g_czClassName[] = "myClass";
 std::string ipaddr, port, name;
 std::string GetTextEditMsg(HWND hwnd, int idcHandle);
-DWORD WINAPI thread2(LPVOID t);
+void receiveMessage(HWND hwnd, ClientSocket sock);
 
 BOOL CALLBACK DlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM) {
 	switch (Message) {
 		case WM_INITDIALOG:
 			SetDlgItemText(hwnd, IDC_TEXT, "127.0.0.1");
-			SetDlgItemText(hwnd, IDC_TEXT2, "54000");
+			SetDlgItemText(hwnd, IDC_TEXT2, "53500");
 			SetDlgItemText(hwnd, IDC_TEXT3, "Enter your nickname");
 		break;
 		case WM_COMMAND:
@@ -24,7 +26,13 @@ BOOL CALLBACK DlgProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM) {
 					ipaddr = GetTextEditMsg(hwnd, IDC_TEXT);
 					port = GetTextEditMsg(hwnd, IDC_TEXT2);
 					name = GetTextEditMsg(hwnd, IDC_TEXT3);
-					EndDialog(hwnd, IDOK);
+					//check port for correct numbers
+					if (!(port.end() == std::find_if_not(port.begin(), port.end(), ::isdigit))) {
+						MessageBox(0, "Incorrect port", "Err", MB_ICONEXCLAMATION | MB_OK);
+					}
+					else {
+						EndDialog(hwnd, IDOK);
+					}
 				}
 				break;
 				case IDCANCEL:
@@ -104,20 +112,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam){
 				break;
 			}
 		break;
-		case WM_ENABLE: {
-			char buff[4069];
-			ZeroMemory(&buff, 4069);
-			sock = (ClientSocket*)GetWindowLongPtr(hwnd, GWL_USERDATA);
-			int bytesIn = recv(sock->getSocket(), buff, 4069, 0);
-			HWND hEdit = GetDlgItem(hwnd, IDC_MAIN_MESSAGES);
-			int ndx = GetWindowTextLength(hEdit);
-			SetFocus(hEdit);
-			SendMessage(hEdit, EM_SETSEL, (WPARAM)ndx, (LPARAM)ndx);
-			SendMessage(hEdit, EM_REPLACESEL, 0, (LPARAM)((LPSTR)buff));
-			SetFocus(GetDlgItem(hwnd, IDC_MAIN_ENTER));
-
-		}
-		break;
 		case WM_COMMAND:
 			switch (LOWORD(wParam)) {
 				case ID_FILE_EXIT: {
@@ -175,18 +169,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 	int ret = DialogBox(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_DIALOG1), hWnd, DlgProc);
 	if (ret == IDOK) {
-		//	MessageBox(hwnd, "Ok", "ok", MB_OK);
+			//MessageBox(hWnd, "Ok", "ok", MB_OK);
 	}
 	else if (ret == -1) {
 		MessageBox(hWnd, "DIALOG FAILED", "DIALOG FAILED", MB_OK);
 	}
 	
 	client.FillIn(ipaddr, atoi(port.c_str()), name);
+	client.setHwnd(hWnd);
 
 	if (client.Init()) {
 		client.Run();
 	}
 	
+	std::thread receiveThread(receiveMessage, std::ref(hWnd), std::ref(client));
+	receiveThread.detach();
+
 	while (GetMessage(&msg, NULL, 0, 0) > 0) {
 		if (msg.message == WM_KEYDOWN) SendMessage(hWnd, WM_KEYDOWN, msg.wParam, msg.lParam);
 		TranslateMessage(&msg);
@@ -194,7 +192,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 	return msg.wParam;
 }
-
 
 std::string GetTextEditMsg(HWND hwnd, int idcHandle) {
 	int len = GetWindowTextLength(GetDlgItem(hwnd, idcHandle));
@@ -209,21 +206,16 @@ std::string GetTextEditMsg(HWND hwnd, int idcHandle) {
 	return nullptr;
 }
 
-DWORD thread2(LPVOID t)
-{
-	LPCREATESTRUCT lpCreateStruct = (LPCREATESTRUCT)t;
-	ClientSocket *sock = (ClientSocket*)lpCreateStruct->lpCreateParams;
-	fd_set master;
-	FD_ZERO(&master);
-	FD_SET(sock->getSocket(), &master);
-	struct timeval tv;
-	tv.tv_sec = 0;
-	tv.tv_usec = 3000;
+void receiveMessage(HWND hwnd, ClientSocket sock) {
 	while (true) {
-		fd_set copy = master;
-		int socketCount = select(0, &copy, nullptr, nullptr, &tv);
-		if (socketCount > 0) {
-			SendMessage(hWnd, WM_ENABLE, NULL, NULL);
-		}
-		return 0;
+		char buff[4069];
+		ZeroMemory(&buff, 4069);
+		int bytesIn = recv(sock.getSocket(), buff, 4069, 0);
+		HWND hEdit = GetDlgItem(hwnd, IDC_MAIN_MESSAGES);
+		int ndx = GetWindowTextLength(hEdit);
+		SetFocus(hEdit);
+		SendMessage(hEdit, EM_SETSEL, (WPARAM)ndx, (LPARAM)ndx);
+		SendMessage(hEdit, EM_REPLACESEL, 0, (LPARAM)((LPSTR)buff));
+		SetFocus(GetDlgItem(hwnd, IDC_MAIN_ENTER));
+	}
 }

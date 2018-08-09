@@ -11,11 +11,13 @@ private:
 	int m_port;
 	std::string m_name;
 	SOCKET m_sock;
+	HWND hwnd;
 public:
 	ClientSocket( std::string ipaddr, int port, std::string name);
 	ClientSocket();
 	~ClientSocket();
 	void FillIn(std::string ipaddr, int port, std::string name);
+	void setHwnd(HWND hwnd);
 	bool Init();
 	void Run();
 	void Send(std::string msg);
